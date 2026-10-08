@@ -1,0 +1,32 @@
+name: Deploy to Prisma Compute
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build
+        run: bun run build
+
+      - name: Deploy to Prisma Compute
+        run: bun x prisma deploy module.ts
+        env:
+          PRISMA_SERVICE_TOKEN: ${{ secrets.PRISMA_SERVICE_TOKEN }}
+          PRISMA_WORKSPACE_ID: jn6tuvf1ablauozbpgv3frxh
+          PRISMA_REGION: ap-northeast-1
+          # MCP_AUTH_TOKEN is already set in the Prisma Console (production config map);
+          # the deploy reuses it. Only needed here if it ever goes missing:
+          # MCP_AUTH_TOKEN: ${{ secrets.MCP_AUTH_TOKEN }}
