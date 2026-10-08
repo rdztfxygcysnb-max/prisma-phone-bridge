@@ -1,0 +1,15 @@
+{
+  "name": "phone-bridge-prisma",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun build src/server.ts --target=bun --outfile dist/server.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.0",
+    "@prisma/composer": "latest",
+    "@prisma/composer-prisma-cloud": "latest",
+    "arktype": "^2.2.8",
+    "prisma": "^8.0.0-rc.21"
+  }
+}

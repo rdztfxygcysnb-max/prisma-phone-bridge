@@ -1,0 +1,35 @@
+{
+  "status": "created",
+  "fqn": "COMPOSER_WEB_INPUT-var",
+  "logicalId": "COMPOSER_WEB_INPUT-var",
+  "instanceId": "fb2c12f03452d71b66d22f01db708589",
+  "resourceType": "Prisma.EnvironmentVariable",
+  "props": {
+    "project": "local",
+    "key": "COMPOSER_WEB_INPUT",
+    "value": {
+      "__redacted__": "{\"mcpAuthToken\":{\"$secret\":\"MCP_AUTH_TOKEN\"}}"
+    },
+    "class": "production"
+  },
+  "attr": {
+    "environmentVariableId": "COMPOSER_WEB_INPUT",
+    "projectId": "local",
+    "branchId": null,
+    "class": "production",
+    "key": "COMPOSER_WEB_INPUT",
+    "value": {
+      "__redacted__": "{\"mcpAuthToken\":{\"$secret\":\"MCP_AUTH_TOKEN\"}}"
+    },
+    "valueKid": "",
+    "isManagedBySystem": false,
+    "createdAt": "1970-01-01T00:00:00.000Z",
+    "updatedAt": "1970-01-01T00:00:00.000Z"
+  },
+  "bindings": [],
+  "providerVersion": 0,
+  "downstream": [
+    "web-deploy"
+  ],
+  "removalPolicy": "destroy"
+}

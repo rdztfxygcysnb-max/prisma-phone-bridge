@@ -1,0 +1,35 @@
+{
+  "status": "created",
+  "fqn": "COMPOSER_WEB_PORT-var",
+  "logicalId": "COMPOSER_WEB_PORT-var",
+  "instanceId": "53b0ccf2276e65e6462d435fe638c36b",
+  "resourceType": "Prisma.EnvironmentVariable",
+  "props": {
+    "project": "local",
+    "key": "COMPOSER_WEB_PORT",
+    "value": {
+      "__redacted__": "3000"
+    },
+    "class": "production"
+  },
+  "attr": {
+    "environmentVariableId": "COMPOSER_WEB_PORT",
+    "projectId": "local",
+    "branchId": null,
+    "class": "production",
+    "key": "COMPOSER_WEB_PORT",
+    "value": {
+      "__redacted__": "3000"
+    },
+    "valueKid": "",
+    "isManagedBySystem": false,
+    "createdAt": "1970-01-01T00:00:00.000Z",
+    "updatedAt": "1970-01-01T00:00:00.000Z"
+  },
+  "bindings": [],
+  "providerVersion": 0,
+  "downstream": [
+    "web-deploy"
+  ],
+  "removalPolicy": "destroy"
+}

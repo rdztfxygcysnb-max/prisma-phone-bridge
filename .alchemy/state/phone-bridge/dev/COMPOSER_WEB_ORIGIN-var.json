@@ -1,0 +1,35 @@
+{
+  "status": "created",
+  "fqn": "COMPOSER_WEB_ORIGIN-var",
+  "logicalId": "COMPOSER_WEB_ORIGIN-var",
+  "instanceId": "4abc51e47f1a72e6b93543b6ec745345",
+  "resourceType": "Prisma.EnvironmentVariable",
+  "props": {
+    "project": "local",
+    "key": "COMPOSER_WEB_ORIGIN",
+    "value": {
+      "__redacted__": "\"http://localhost:3000\""
+    },
+    "class": "production"
+  },
+  "attr": {
+    "environmentVariableId": "COMPOSER_WEB_ORIGIN",
+    "projectId": "local",
+    "branchId": null,
+    "class": "production",
+    "key": "COMPOSER_WEB_ORIGIN",
+    "value": {
+      "__redacted__": "\"http://localhost:3000\""
+    },
+    "valueKid": "",
+    "isManagedBySystem": false,
+    "createdAt": "1970-01-01T00:00:00.000Z",
+    "updatedAt": "1970-01-01T00:00:00.000Z"
+  },
+  "bindings": [],
+  "providerVersion": 0,
+  "downstream": [
+    "web-deploy"
+  ],
+  "removalPolicy": "destroy"
+}

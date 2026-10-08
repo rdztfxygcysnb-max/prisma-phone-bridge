@@ -1,0 +1,43 @@
+{
+  "status": "updated",
+  "fqn": "web-deploy",
+  "logicalId": "web-deploy",
+  "instanceId": "30ea166d674cb4a0ccc53289fdbe1378",
+  "resourceType": "Prisma.Deployment",
+  "props": {
+    "app": "web",
+    "artifactPath": "/home/hatch/workspace/.tmp/prisma-composer-compute-0/9e0e1fdcf673939b/web.tar.gz",
+    "artifactContentType": "application/gzip",
+    "triggers": {
+      "COMPOSER_WEB_PORT": {
+        "__redacted__": "3000"
+      },
+      "COMPOSER_WEB_INPUT": {
+        "__redacted__": "{\"mcpAuthToken\":{\"$secret\":\"MCP_AUTH_TOKEN\"}}"
+      },
+      "COMPOSER_WEB_ORIGIN": {
+        "__redacted__": "\"http://localhost:3000\""
+      },
+      "MCP_AUTH_TOKEN:updatedAt": "?"
+    },
+    "portMapping": {
+      "http": 3000
+    },
+    "start": true,
+    "promote": true
+  },
+  "attr": {
+    "deploymentId": "9e0e1fdcf673939b34588ca3c8d7cbdf3ec19eb794ece88eccd77e6b2c13e9e2",
+    "appId": "web",
+    "foundryVersionId": "9e0e1fdcf673939b34588ca3c8d7cbdf3ec19eb794ece88eccd77e6b2c13e9e2",
+    "status": "running",
+    "previewDomain": null,
+    "artifactHash": "9e0e1fdcf673939b34588ca3c8d7cbdf3ec19eb794ece88eccd77e6b2c13e9e2",
+    "appEndpointDomain": "http://localhost:3000",
+    "createdAt": "1970-01-01T00:00:00.000Z"
+  },
+  "bindings": [],
+  "providerVersion": 0,
+  "downstream": [],
+  "removalPolicy": "destroy"
+}

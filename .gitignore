@@ -1,0 +1,5 @@
+.token
+.prisma-service-token
+node_modules/
+dist/
+.prisma-composer/

@@ -1,0 +1,28 @@
+{
+  "status": "created",
+  "fqn": "web-svc",
+  "logicalId": "web-svc",
+  "instanceId": "02409efa8518709b9c23c54a82528128",
+  "resourceType": "Prisma.App",
+  "props": {
+    "project": "local",
+    "displayName": "web"
+  },
+  "attr": {
+    "appId": "web",
+    "name": "web",
+    "projectId": "local",
+    "regionId": "us-east-1",
+    "branchId": null,
+    "latestDeploymentId": null,
+    "appEndpointDomain": "http://localhost:3000",
+    "createdAt": "1970-01-01T00:00:00.000Z"
+  },
+  "bindings": [],
+  "providerVersion": 0,
+  "downstream": [
+    "COMPOSER_WEB_ORIGIN-var",
+    "web-deploy"
+  ],
+  "removalPolicy": "destroy"
+}
