@@ -171,6 +171,67 @@ async function saveTask(t: PiTask): Promise<void> {
   await writeFile(join(TASKS_DIR, t.id + ".json"), JSON.stringify(t), "utf8");
 }
 
+async function submitPiTask(task: string, session_id: string): Promise<PiTask> {
+  const t: PiTask = {
+    id: randomUUID(),
+    task: task.slice(0, 8000),
+    session_id: (session_id || "").slice(0, 128),
+    status: "pending",
+    created_at: new Date().toISOString(),
+  };
+  await saveTask(t);
+  return t;
+}
+
+function webAuthed(url: URL): boolean {
+  const tok = url.searchParams.get("token") || "";
+  const a = Buffer.from(tok);
+  const b = Buffer.from(TOKEN);
+  return a.length === b.length && a.length > 0 && timingSafeEqual(a, b);
+}
+
+const PI_DASH_HTML = `<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Pi Remote</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f6f1e7;color:#3a3428;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh;padding:14px;max-width:640px;margin:0 auto}
+h1{font-size:20px;margin:6px 2px 12px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#4caf50;margin-right:6px;vertical-align:1px}
+.card{background:#fffdf7;border:1px solid #e8dfc9;border-radius:14px;padding:12px;margin-bottom:10px;box-shadow:0 2px 8px rgba(120,100,60,.07)}
+textarea,input{width:100%;border:1px solid #ddd2b8;border-radius:10px;padding:10px;font-size:15px;background:#fffdf7;color:#3a3428;font-family:inherit}
+textarea{min-height:84px;resize:vertical}
+button{background:#b9792f;color:#fff;border:0;border-radius:10px;padding:11px 18px;font-size:15px;width:100%;margin-top:8px}
+button:active{transform:scale(.98)}
+.badge{display:inline-block;font-size:12px;padding:2px 9px;border-radius:20px;margin-right:6px}
+.pending{background:#f3e3bb;color:#8a6d1f}.running{background:#cfe4f7;color:#1f5c8a}.done{background:#d8ecd2;color:#2f7a2a}
+.task{font-size:14px;margin:6px 0;color:#5a5245;white-space:pre-wrap;word-break:break-word}
+.out{background:#2e2a24;color:#e8e2d2;border-radius:10px;padding:10px;font-size:13px;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow:auto;margin-top:8px;font-family:monospace}
+.meta{font-size:12px;color:#a09a89}
+.row{display:flex;align-items:center;margin-bottom:6px}
+.empty{text-align:center;color:#a09a89;padding:30px 0;font-size:14px}
+</style></head><body>
+<h1><span class="dot"></span>Pi Remote</h1>
+<div class="card">
+<textarea id="task" placeholder="让云电脑上的 pi 做什么？例如：把 ~/workspace/agentdeck 的 README 补上安装说明"></textarea>
+<input id="sid" style="margin-top:8px" placeholder="session_id（继续上次会话，可空）">
+<button onclick="submit()">派活给 pi</button>
+</div>
+<div id="list"></div>
+<script>
+const token=new URLSearchParams(location.search).get("token")||"";
+async function api(p,o){const r=await fetch(p+"?token="+encodeURIComponent(token),o);return r.json();}
+async function submit(){const t=document.getElementById("task").value.trim();if(!t)return alert("先写任务");const s=document.getElementById("sid").value.trim();
+const r=await api("/pi/submit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task:t,session_id:s})});
+document.getElementById("task").value="";load();}
+function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+async function load(){const ts=await api("/pi/tasks");const el=document.getElementById("list");
+if(!ts.length){el.innerHTML='<div class="empty">还没有任务，派第一个吧</div>';return;}
+el.innerHTML=ts.map(t=>'<div class="card"><div class="row"><span class="badge '+t.status+'">'+t.status+'</span><span class="meta">'+t.id.slice(0,8)+' · '+t.created_at.slice(5,16).replace("T"," ")+'</span></div><div class="task">'+esc(t.task.slice(0,300))+'</div>'+(t.status==="done"?'<div class="out">'+esc((t.output||"").slice(0,4000))+'</div>':"")+'</div>').join("");}
+load();setInterval(load,5000);
+</script></body></html>`;
+
 function registerPiTools(server: McpServer): void {
   server.registerTool(
     "pi_task_submit",
@@ -186,14 +247,7 @@ function registerPiTools(server: McpServer): void {
       },
     },
     async ({ task, session_id }) => {
-      const t: PiTask = {
-        id: randomUUID(),
-        task: task.slice(0, 8000),
-        session_id: (session_id || "").slice(0, 128),
-        status: "pending",
-        created_at: new Date().toISOString(),
-      };
-      await saveTask(t);
+      const t = await submitPiTask(task, session_id || "");
       return { content: [{ type: "text", text: `task_id=${t.id}` }] };
     }
   );
@@ -324,6 +378,53 @@ createServer(async (req: IncomingMessage, res: ServerResponse) => {
     }
     if (url.pathname.startsWith("/pi/")) {
       if (await handlePiHttp(req, res, url)) return;
+    }
+    // ---- pi web dashboard (token via ?token=, same bearer as MCP) ----
+    if (url.pathname === "/pi" || url.pathname === "/pi/") {
+      if (!webAuthed(url)) {
+        res.writeHead(401);
+        res.end("unauthorized: add ?token=YOUR_MCP_BEARER_TOKEN");
+        return;
+      }
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(PI_DASH_HTML);
+      return;
+    }
+    if (url.pathname === "/pi/tasks" && req.method === "GET") {
+      if (!webAuthed(url)) {
+        res.writeHead(401);
+        res.end("unauthorized");
+        return;
+      }
+      const files = await readdir(TASKS_DIR).catch(() => [] as string[]);
+      const tasks: PiTask[] = [];
+      for (const f of files) {
+        const t = await loadTask(f.replace(/\.json$/, ""));
+        if (t) tasks.push(t);
+      }
+      tasks.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify(tasks.slice(0, 30)));
+      return;
+    }
+    if (url.pathname === "/pi/submit" && req.method === "POST") {
+      if (!webAuthed(url)) {
+        res.writeHead(401);
+        res.end("unauthorized");
+        return;
+      }
+      let body: any;
+      try {
+        body = await readBody(req);
+      } catch {
+        res.writeHead(400);
+        res.end("bad json");
+        return;
+      }
+      const t = await submitPiTask(String(body?.task || ""), String(body?.session_id || ""));
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ task_id: t.id }));
+      return;
     }
     res.writeHead(404);
     res.end("not found");
