@@ -314,9 +314,17 @@ async function handlePiHttp(
     }
     const files = await readdir(TASKS_DIR).catch(() => [] as string[]);
     let picked: PiTask | null = null;
+    const now = Date.now();
+    const STALE_MS = 15 * 60 * 1000; // a claim older than this means the runner died
     for (const f of files.sort()) {
       const t = await loadTask(f.replace(/\.json$/, ""));
-      if (t && t.status === "pending" && (!picked || t.created_at < picked.created_at))
+      if (!t) continue;
+      if (t.status === "running" && t.claimed_at && now - Date.parse(t.claimed_at) > STALE_MS) {
+        t.status = "pending"; // stale claim: runner died mid-task, requeue
+        delete t.claimed_at;
+        await saveTask(t);
+      }
+      if (t.status === "pending" && (!picked || t.created_at < picked.created_at))
         picked = t;
     }
     if (!picked) {
