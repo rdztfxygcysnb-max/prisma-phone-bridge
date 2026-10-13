@@ -5,7 +5,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 import { mkdir, writeFile, readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { timingSafeEqual } from "node:crypto";
+import { timingSafeEqual, randomUUID } from "node:crypto";
 
 // ---- config: bearer token arrives via the service input schema (bound to the
 // MCP_AUTH_TOKEN platform secret at provision time). Never hardcoded.
@@ -136,7 +136,153 @@ function mcp(): McpServer {
     }
   );
 
+  registerPiTools(server);
+
   return server;
+}
+
+// ---- pi task queue: phone agent submits via MCP, cloud VM claims via HTTP ----
+const TASKS_DIR = "/tmp/pi-tasks";
+await mkdir(TASKS_DIR, { recursive: true });
+
+type PiTask = {
+  id: string;
+  task: string;
+  session_id: string;
+  status: "pending" | "running" | "done";
+  output?: string;
+  ok?: boolean;
+  created_at: string;
+  claimed_at?: string;
+  done_at?: string;
+};
+
+async function loadTask(id: string): Promise<PiTask | null> {
+  const safe = id.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 64);
+  if (!safe) return null;
+  try {
+    return JSON.parse(await readFile(join(TASKS_DIR, safe + ".json"), "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+async function saveTask(t: PiTask): Promise<void> {
+  await writeFile(join(TASKS_DIR, t.id + ".json"), JSON.stringify(t), "utf8");
+}
+
+function registerPiTools(server: McpServer): void {
+  server.registerTool(
+    "pi_task_submit",
+    {
+      description:
+        "Submit a task for the pi coding agent running on the cloud VM. Returns a task_id; poll pi_task_status for the result. Tasks are ephemeral: if the bridge restarts mid-task, the task is lost and must be resubmitted.",
+      inputSchema: {
+        task: z.string().describe("What pi should do (coding task description)"),
+        session_id: z
+          .string()
+          .optional()
+          .describe("Continue a previous pi session; omit to start a new one"),
+      },
+    },
+    async ({ task, session_id }) => {
+      const t: PiTask = {
+        id: randomUUID(),
+        task: task.slice(0, 8000),
+        session_id: (session_id || "").slice(0, 128),
+        status: "pending",
+        created_at: new Date().toISOString(),
+      };
+      await saveTask(t);
+      return { content: [{ type: "text", text: `task_id=${t.id}` }] };
+    }
+  );
+
+  server.registerTool(
+    "pi_task_status",
+    {
+      description:
+        "Check a pi task's status (pending/running/done). When done, includes the agent's output.",
+      inputSchema: { task_id: z.string() },
+    },
+    async ({ task_id }) => {
+      const t = await loadTask(task_id);
+      if (!t)
+        return {
+          content: [
+            {
+              type: "text",
+              text: "task not found (it may have expired after a bridge restart — resubmit)",
+            },
+          ],
+        };
+      let text = `status=${t.status}`;
+      if (t.status === "done") text += `\n--- output ---\n${(t.output || "").slice(0, 20000)}`;
+      return { content: [{ type: "text", text }] };
+    }
+  );
+}
+
+async function handlePiHttp(
+  req: IncomingMessage,
+  res: ServerResponse,
+  url: URL
+): Promise<boolean> {
+  if (url.pathname === "/pi/claim" && req.method === "POST") {
+    if (!authed(req)) {
+      res.writeHead(401);
+      res.end("unauthorized");
+      return true;
+    }
+    const files = await readdir(TASKS_DIR).catch(() => [] as string[]);
+    let picked: PiTask | null = null;
+    for (const f of files.sort()) {
+      const t = await loadTask(f.replace(/\.json$/, ""));
+      if (t && t.status === "pending" && (!picked || t.created_at < picked.created_at))
+        picked = t;
+    }
+    if (!picked) {
+      res.writeHead(204);
+      res.end();
+      return true;
+    }
+    picked.status = "running";
+    picked.claimed_at = new Date().toISOString();
+    await saveTask(picked);
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ id: picked.id, task: picked.task, session_id: picked.session_id }));
+    return true;
+  }
+  if (url.pathname === "/pi/result" && req.method === "POST") {
+    if (!authed(req)) {
+      res.writeHead(401);
+      res.end("unauthorized");
+      return true;
+    }
+    let body: any;
+    try {
+      body = await readBody(req);
+    } catch {
+      res.writeHead(400);
+      res.end("bad json");
+      return true;
+    }
+    const t = await loadTask(String(body?.task_id || ""));
+    if (!t) {
+      res.writeHead(404);
+      res.end("task not found");
+      return true;
+    }
+    t.status = "done";
+    t.ok = !!body?.ok;
+    t.output = String(body?.output || "").slice(0, 60000);
+    t.done_at = new Date().toISOString();
+    await saveTask(t);
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ ok: true }));
+    return true;
+  }
+  return false;
 }
 
 const port = service.port();
@@ -175,6 +321,9 @@ createServer(async (req: IncomingMessage, res: ServerResponse) => {
       await server.connect(transport);
       await transport.handleRequest(req, res, body);
       return;
+    }
+    if (url.pathname.startsWith("/pi/")) {
+      if (await handlePiHttp(req, res, url)) return;
     }
     res.writeHead(404);
     res.end("not found");
